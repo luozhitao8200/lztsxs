@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实训室管理系统 - 管理界面</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.12.0/dist/av-min.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>实训室管理系统</h1>
+            <div class="header-buttons">
+                <button class="btn btn-primary" id="addLabBtn">添加实训室</button>
+                <button class="btn btn-info" id="summaryBtn">使用汇总</button>
+                <button class="btn btn-danger" id="logoutBtn">退出登录</button>
+            </div>
+        </div>
+
+        <div class="lab-grid" id="labGrid">
+            <!-- 实训室卡片将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 添加/编辑实训室的模态框 -->
+    <div class="modal" id="labModal">
+        <div class="modal-content modal-large">
+            <h2 id="modalTitle">添加实训室</h2>
+            <form id="labForm">
+                <div class="input-group">
+                    <input type="text" id="labName" required placeholder="实训室名称">
+                </div>
+                <div class="input-group">
+                    <select id="labStatus" required>
+                        <option value="free">空闲</option>
+                        <option value="reserved">已预约</option>
+                        <option value="occupied">使用中</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <textarea id="labEquipment" placeholder="设备列表（每行一个）"></textarea>
+                </div>
+                <div class="reservation-management" style="display: none;">
+                    <h3>预约管理</h3>
+                    <div class="reservation-list" id="editReservationList">
+                        <!-- 预约列表将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" class="btn btn-danger" id="cancelBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 预约日历模态框 -->
+    <div class="modal" id="reservationModal">
+        <div class="modal-content">
+            <h2>预约实训室</h2>
+            <form id="reservationForm">
+                <div class="input-group">
+                    <label>预约日期：</label>
+                    <input type="date" id="reservationDate" required>
+                </div>
+                <div class="input-group">
+                    <label>课节：</label>
+                    <select id="classTime" required>
+                        <option value="">请选择课节</option>
+                        <option value="1-2">第一二节（8:30-10:00）</option>
+                        <option value="3-4">第三四节（10:15-11:45）</option>
+                        <option value="5-6">第五六节（14:30-16:00）</option>
+                        <option value="7-8">第七八节（16:10-17:40）</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>预约人：</label>
+                    <input type="text" id="reservationPerson" required placeholder="请输入预约人姓名">
+                </div>
+                <div class="input-group">
+                    <label>用途说明：</label>
+                    <textarea id="reservationPurpose" placeholder="请简要说明使用用途"></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">确认预约</button>
+                    <button type="button" class="btn btn-danger" id="cancelReservationBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 使用汇总模态框 -->
+    <div class="modal" id="summaryModal">
+        <div class="modal-content modal-large">
+            <h2>实训室使用汇总</h2>
+            <div class="summary-controls">
+                <div class="input-group">
+                    <label>开始日期：</label>
+                    <input type="date" id="summaryStartDate">
+                </div>
+                <div class="input-group">
+                    <label>结束日期：</label>
+                    <input type="date" id="summaryEndDate">
+                </div>
+                <button class="btn btn-primary" id="searchSummaryBtn">查询</button>
+            </div>
+            <div class="summary-content" id="summaryContent">
+                <!-- 汇总内容将通过JavaScript动态生成 -->
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-danger" id="closeSummaryBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员密码验证模态框 -->
+    <div class="modal" id="adminAuthModal">
+        <div class="modal-content">
+            <h2>管理员验证</h2>
+            <form id="adminAuthForm">
+                <div class="input-group">
+                    <label>请输入管理员密码：</label>
+                    <input type="password" id="adminPassword" required>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">确认</button>
+                    <button type="button" class="btn btn-danger" id="cancelAuthBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
