@@ -88,15 +88,23 @@ let labData = JSON.parse(localStorage.getItem('labData')) || [];
 // 登录表单处理
 const loginForm = document.getElementById('loginForm');
 if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
 
-        if (username === validUser.username && password === validUser.password) {
-            window.location.href = 'dashboard.html';
-        } else {
-            alert('账号或密码错误！');
+        try {
+            // 验证用户名和密码
+            if (username === validUser.username && password === validUser.password) {
+                // 登录成功后初始化 LeanCloud
+                await loadLabData(); // 确保数据加载成功
+                window.location.href = 'dashboard.html';
+            } else {
+                alert('账号或密码错误！');
+            }
+        } catch (error) {
+            console.error('登录失败:', error);
+            alert('登录失败，请重试');
         }
     });
 }
@@ -233,7 +241,7 @@ if (dashboard) {
     function renderEditReservations(reservations, labIndex) {
         const editReservationList = document.getElementById('editReservationList');
         if (!reservations || reservations.length === 0) {
-            editReservationList.innerHTML = '<div class="no-reservations">暂无预约记录</div>';
+            editReservationList.innerHTML = '<div class="no-reservations">暂无预约记��</div>';
             return;
         }
 
