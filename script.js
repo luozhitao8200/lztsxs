@@ -200,7 +200,7 @@ function checkLogin() {
     }
 }
 
-// 获取课节��本
+// 获取课节��
 function getClassTimeText(classTime) {
     const times = {
         '1-2': '第一二节（8:30-10:00）',
@@ -319,8 +319,17 @@ window.editLab = function(index) {
 
 // 删除实训室
 window.deleteLab = function(index) {
-    showAdminAuth(() => {
+    showAdminAuth(async () => {
         if (confirm('确定要删除这个实训室吗？')) {
+            const lab = labData[index];
+            if (lab.id) {
+                try {
+                    const labObj = AV.Object.createWithoutData('Lab', lab.id);
+                    await labObj.destroy();
+                } catch (error) {
+                    console.error('删除失败:', error);
+                }
+            }
             labData.splice(index, 1);
             renderLabs();
         }
@@ -481,7 +490,7 @@ function showSummary() {
     });
 
     if (Object.keys(groupedReservations).length === 0) {
-        summaryContent.innerHTML = '<div class="summary-group"><p>所选日期范围内没有���约记录</p></div>';
+        summaryContent.innerHTML = '<div class="summary-group"><p>所选日期范围内没有预约记录</p></div>';
         return;
     }
 
@@ -506,15 +515,84 @@ function showSummary() {
 }
 
 // 加载实训室数据
-function loadLabData() {
+async function loadLabData() {
     try {
+        // 先从本地加载数据
         const localData = localStorage.getItem('labData');
         if (localData) {
             labData = JSON.parse(localData);
             renderLabs();
         }
+
+        // 尝试从云端加载数据
+        const query = new AV.Query('Lab');
+        const results = await query.find();
+        
+        if (results && results.length > 0) {
+            // 如果云端有数据，使用云端数据
+            labData = results.map(lab => ({
+                id: lab.id,
+                name: lab.get('name'),
+                status: lab.get('status'),
+                equipment: lab.get('equipment') || [],
+                reservations: lab.get('reservations') || []
+            }));
+            renderLabs();
+        } else if (labData.length > 0) {
+            // 如果云端没有数据但本地有，则上传本地数据
+            await syncLocalDataToCloud();
+        }
     } catch (error) {
         console.error('数据加载失败:', error);
+    }
+}
+
+// 添加数据同步函数
+async function syncLocalDataToCloud() {
+    try {
+        for (const lab of labData) {
+            const labObj = new Lab();
+            labObj.set('name', lab.name);
+            labObj.set('status', lab.status);
+            labObj.set('equipment', lab.equipment);
+            labObj.set('reservations', lab.reservations);
+            await labObj.save();
+        }
+        console.log('本地数据已同步到云端');
+    } catch (error) {
+        console.error('数据同步失败:', error);
+    }
+}
+
+// 修改保存函数
+async function saveLabs() {
+    try {
+        // 保存到本地
+        localStorage.setItem('labData', JSON.stringify(labData));
+
+        // 保存到云端
+        for (const lab of labData) {
+            if (lab.id) {
+                // 更新已有数据
+                const labObj = AV.Object.createWithoutData('Lab', lab.id);
+                labObj.set('name', lab.name);
+                labObj.set('status', lab.status);
+                labObj.set('equipment', lab.equipment);
+                labObj.set('reservations', lab.reservations);
+                await labObj.save();
+            } else {
+                // 创建新数据
+                const labObj = new Lab();
+                labObj.set('name', lab.name);
+                labObj.set('status', lab.status);
+                labObj.set('equipment', lab.equipment);
+                labObj.set('reservations', lab.reservations);
+                const savedLab = await labObj.save();
+                lab.id = savedLab.id;
+            }
+        }
+    } catch (error) {
+        console.error('保存失败:', error);
     }
 }
 
@@ -555,3 +633,13 @@ window.deleteReservation = function(labIndex, reservationIndex) {
         renderLabs();
     }
 }; 
+
+// 初始化 LeanCloud
+AV.init({
+    appId: "你的AppID",
+    appKey: "你的AppKey",
+    serverURL: "https://你的服务器域名"  // 这个需要根据你创建的应用来填写
+});
+
+// 定义 Lab 类
+const Lab = AV.Object.extend('Lab'); 
