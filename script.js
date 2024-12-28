@@ -200,7 +200,7 @@ function checkLogin() {
     }
 }
 
-// 获取课节��
+// 获取课节
 function getClassTimeText(classTime) {
     const times = {
         '1-2': '第一二节（8:30-10:00）',
@@ -514,22 +514,18 @@ function showSummary() {
     summaryContent.innerHTML = html;
 }
 
+// 定义 Lab 类
+const Lab = AV.Object.extend('Lab');
+
 // 加载实训室数据
 async function loadLabData() {
     try {
-        // 先从本地加载数据
-        const localData = localStorage.getItem('labData');
-        if (localData) {
-            labData = JSON.parse(localData);
-            renderLabs();
-        }
-
-        // 尝试从云端加载数据
+        // 从云端加载数据
         const query = new AV.Query('Lab');
         const results = await query.find();
         
         if (results && results.length > 0) {
-            // 如果云端有数据，使用云端数据
+            // 使用云端数据
             labData = results.map(lab => ({
                 id: lab.id,
                 name: lab.get('name'),
@@ -537,17 +533,28 @@ async function loadLabData() {
                 equipment: lab.get('equipment') || [],
                 reservations: lab.get('reservations') || []
             }));
-            renderLabs();
-        } else if (labData.length > 0) {
-            // 如果云端没有数据但本地有，则上传本地数据
-            await syncLocalDataToCloud();
+        } else {
+            // 如果云端没有数据，使用本地数据
+            const localData = localStorage.getItem('labData');
+            if (localData) {
+                labData = JSON.parse(localData);
+                // 上传本地数据到云端
+                await syncLocalDataToCloud();
+            }
         }
+        renderLabs();
     } catch (error) {
         console.error('数据加载失败:', error);
+        // 如果云端加载失败，使用本地数据
+        const localData = localStorage.getItem('labData');
+        if (localData) {
+            labData = JSON.parse(localData);
+            renderLabs();
+        }
     }
 }
 
-// 添加数据同步函数
+// 同步本地数据到云端
 async function syncLocalDataToCloud() {
     try {
         for (const lab of labData) {
@@ -556,7 +563,8 @@ async function syncLocalDataToCloud() {
             labObj.set('status', lab.status);
             labObj.set('equipment', lab.equipment);
             labObj.set('reservations', lab.reservations);
-            await labObj.save();
+            const savedLab = await labObj.save();
+            lab.id = savedLab.id;
         }
         console.log('本地数据已同步到云端');
     } catch (error) {
@@ -564,16 +572,16 @@ async function syncLocalDataToCloud() {
     }
 }
 
-// 修改保存函数
+// 保存实训室数据
 async function saveLabs() {
     try {
-        // 保存到本地
+        // 保存到本地（作为备份）
         localStorage.setItem('labData', JSON.stringify(labData));
 
         // 保存到云端
         for (const lab of labData) {
             if (lab.id) {
-                // 更新已有数据
+                // 更新现有数据
                 const labObj = AV.Object.createWithoutData('Lab', lab.id);
                 labObj.set('name', lab.name);
                 labObj.set('status', lab.status);
@@ -641,5 +649,22 @@ AV.init({
     serverURL: "https://你的服务器域名"  // 这个需要根据你创建的应用来填写
 });
 
-// 定义 Lab 类
-const Lab = AV.Object.extend('Lab'); 
+// 设置实时更新
+function setupRealtimeUpdate() {
+    // 每30秒自动刷新一次数据
+    setInterval(() => {
+        loadLabData();
+    }, 30000);
+}
+
+// 在页面加载时初始化
+document.addEventListener('DOMContentLoaded', () => {
+    checkLogin();
+    
+    const dashboard = document.querySelector('.dashboard');
+    if (dashboard) {
+        loadLabData();
+        setupRealtimeUpdate();
+        // ... 其他初始化代码 ...
+    }
+}); 
