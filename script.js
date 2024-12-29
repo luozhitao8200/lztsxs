@@ -1,41 +1,80 @@
-// 全局变量和常量定义
+// 全局变量
 const ADMIN_PASSWORD = 'admin';
-let pendingAction = null;
 let labData = [];
+let pendingAction = null;
 
-// 课节时间映射
-const CLASS_TIMES = {
-    '1-2': { start: '08:30', end: '10:00' },
-    '3-4': { start: '10:15', end: '11:45' },
-    '5-6': { start: '14:30', end: '16:00' },
-    '7-8': { start: '16:10', end: '17:40' }
-};
-
-// 工具函数
-function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const weekDay = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][date.getDay()];
-    return `${month}月${day}日 ${weekDay}`;
+// 初始化数据
+try {
+    const savedData = localStorage.getItem('labData');
+    if (savedData) {
+        labData = JSON.parse(savedData);
+    }
+} catch (error) {
+    console.error('初始化数据失败:', error);
 }
 
+// 模拟用户数据
+const validUser = {
+    username: '罗志涛',
+    password: '123456'
+};
+
+// 处理登录
+function handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    if (username === validUser.username && password === validUser.password) {
+        localStorage.setItem('isLoggedIn', 'true');
+        window.location.href = 'dashboard.html';
+    } else {
+        alert('账号或密码错误！');
+    }
+}
+
+// 验证管理员密码
 function verifyAdminPassword(password) {
     return password === ADMIN_PASSWORD;
 }
 
+// 显示管理员验证模态框
 function showAdminAuth(action) {
     const adminAuthModal = document.getElementById('adminAuthModal');
     const adminAuthForm = document.getElementById('adminAuthForm');
     const cancelAuthBtn = document.getElementById('cancelAuthBtn');
 
-    pendingAction = action;
+    // 保存当前打开的其他模态框
+    const openModals = Array.from(document.querySelectorAll('.modal')).filter(modal => 
+        modal.id !== 'adminAuthModal' && modal.style.display === 'block'
+    );
+
+    // 临时隐藏其他模态框
+    openModals.forEach(modal => {
+        modal.style.display = 'none';
+    });
+
+    pendingAction = () => {
+        // 执行操作
+        action();
+        
+        // 恢复之前打开的模态框
+        openModals.forEach(modal => {
+            modal.style.display = 'block';
+        });
+    };
+
     adminAuthModal.style.display = 'block';
 
     cancelAuthBtn.onclick = () => {
         adminAuthModal.style.display = 'none';
         adminAuthForm.reset();
         pendingAction = null;
+        
+        // 恢复之前打开的模态框
+        openModals.forEach(modal => {
+            modal.style.display = 'block';
+        });
     };
 
     adminAuthForm.onsubmit = (e) => {
@@ -54,186 +93,126 @@ function showAdminAuth(action) {
     };
 }
 
-// 页面加载时的初始化
-document.addEventListener('DOMContentLoaded', () => {
-    // 检查登录状态
-    checkLogin();
-
-    // 获取页面元素
-const dashboard = document.querySelector('.dashboard');
-    if (!dashboard) return;
-
-    const labGrid = document.getElementById('labGrid');
-    const labModal = document.getElementById('labModal');
-    const labForm = document.getElementById('labForm');
-    const addLabBtn = document.getElementById('addLabBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const summaryBtn = document.getElementById('summaryBtn');
-    const summaryModal = document.getElementById('summaryModal');
-    const closeSummaryBtn = document.getElementById('closeSummaryBtn');
-    const searchSummaryBtn = document.getElementById('searchSummaryBtn');
-
-    // 绑定事件
-    if (addLabBtn) {
-        addLabBtn.addEventListener('click', () => {
-            showAdminAuth(() => {
-                document.getElementById('modalTitle').textContent = '添加实训室';
-                document.querySelector('.reservation-management').style.display = 'none';
-                labModal.style.display = 'block';
-                labForm.reset();
-            });
-        });
+// 更新实训室状态
+function updateLabStatus(lab) {
+    if (!lab.reservations || lab.reservations.length === 0) {
+        return 'free';
     }
 
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('isLoggedIn');
-            window.location.href = 'index.html';
-        });
-    }
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const today = now.toISOString().split('T')[0];
 
-    if (summaryBtn) {
-        summaryBtn.addEventListener('click', () => {
-            const now = new Date();
-            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-            
-            document.getElementById('summaryStartDate').value = firstDay;
-            document.getElementById('summaryEndDate').value = lastDay;
-            
-            showSummary();
-            summaryModal.style.display = 'block';
-        });
-    }
+    // 检查是否有当前正在进行的预约
+    const currentReservation = lab.reservations.find(reservation => {
+        if (reservation.date !== today) return false;
 
-    if (closeSummaryBtn) {
-        closeSummaryBtn.addEventListener('click', () => {
-            summaryModal.style.display = 'none';
-        });
-    }
+        const timeRange = getTimeRange(reservation.time);
+        if (!timeRange) return false;
 
-    if (searchSummaryBtn) {
-        searchSummaryBtn.addEventListener('click', showSummary);
-    }
-
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
-            labModal.style.display = 'none';
-            labForm.reset();
-            delete labForm.dataset.editIndex;
-        });
-    }
-
-    if (labForm) {
-        labForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const editIndex = labForm.dataset.editIndex;
-            const labInfo = {
-                name: document.getElementById('labName').value,
-                status: document.getElementById('labStatus').value,
-                equipment: document.getElementById('labEquipment').value
-                    .split('\n')
-                    .filter(item => item.trim() !== ''),
-                reservations: editIndex !== undefined ? labData[editIndex].reservations || [] : []
-            };
-
-            if (editIndex !== undefined) {
-                labData[editIndex] = {
-                    ...labData[editIndex],
-                    ...labInfo
-                };
-                delete labForm.dataset.editIndex;
-            } else {
-                labData.push(labInfo);
-            }
-
-            if (editIndex !== undefined) {
-                updateLabStatus(editIndex);
-            }
-
-            renderLabs();
-            labModal.style.display = 'none';
-            labForm.reset();
-        });
-    }
-
-    // 初始化数据
-    loadLabData();
-
-    // 定时更新
-    setInterval(() => {
-        loadLabData();
-    }, 60000);
-}); 
-
-// 模拟用户数据
-const validUser = {
-    username: '罗志涛',
-    password: '123456'
-};
-
-// 登录表单处理
-const loginForm = document.getElementById('loginForm');
-if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-
-        if (username === validUser.username && password === validUser.password) {
-            localStorage.setItem('isLoggedIn', 'true');
-            window.location.href = 'dashboard.html';
-        } else {
-            alert('账号或密码错误！');
-        }
+        return currentTime >= timeRange.start && currentTime <= timeRange.end;
     });
-}
 
-// 检查登录状态
-function checkLogin() {
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const isDashboard = window.location.pathname.includes('dashboard.html');
-    
-    if (!isLoggedIn && isDashboard) {
-        window.location.href = 'index.html';
+    if (currentReservation) {
+        lab.currentUser = currentReservation.person;
+        return 'occupied';
     }
-}
 
-// 获取课节
-function getClassTimeText(classTime) {
-    const times = {
-        '1-2': '第一二节（8:30-10:00）',
-        '3-4': '第三四节（10:15-11:45）',
-        '5-6': '第五六节（14:30-16:00）',
-        '7-8': '第七八节（16:10-17:40）'
-    };
-    return times[classTime] || classTime;
-}
-
-// 获取状态文本
-function getStatusText(status, lab) {
-    const statusMap = {
-        free: '空闲',
-        reserved: '已预约',
-        occupied: '使用中'
-    };
-
-    if (status === 'occupied' && lab.reservations) {
-        const now = new Date();
-        const today = now.toISOString().split('T')[0];
-        const currentClassTime = getCurrentClassTime();
-        
-        const currentReservation = lab.reservations.find(reservation => 
-            reservation.date === today && reservation.classTime === currentClassTime
-        );
-
-        if (currentReservation) {
-            return `${currentReservation.person}使用中`;
+    // 检查是否有当天未结束的预约
+    const hasTodayReservation = lab.reservations.some(reservation => {
+        if (reservation.date === today) {
+            const timeRange = getTimeRange(reservation.time);
+            if (!timeRange) return false;
+            
+            // 只有当预约时间还未结束时才算作今天的预约
+            return currentTime < timeRange.end;
         }
+        return false;
+    });
+
+    if (hasTodayReservation) {
+        return 'today-reserved';
     }
-    
-    return statusMap[status];
+
+    // 检查是否有未来的预约
+    const hasUpcomingReservation = lab.reservations.some(reservation => {
+        return reservation.date > today;
+    });
+
+    if (hasUpcomingReservation) {
+        return 'reserved';  // 未来有预约，显示黄色
+    }
+
+    return 'free';
+}
+
+// 获取时间段的起止时间（分钟）
+function getTimeRange(timeSlot) {
+    const timeRanges = {
+        '1-2节': { start: 8 * 60 + 30, end: 10 * 60 }, // 8:30-10:00
+        '3-4节': { start: 10 * 60 + 15, end: 11 * 60 + 45 }, // 10:15-11:45
+        '5-6节': { start: 14 * 60 + 30, end: 16 * 60 }, // 14:30-16:00
+        '7-8节': { start: 16 * 60 + 10, end: 17 * 60 + 40 } // 16:10-17:40
+    };
+    return timeRanges[timeSlot];
+}
+
+// 检查是否逾期
+function checkOverdue(record) {
+    if (!record.returnStatus || record.returnStatus !== 'confirmed') {
+        const expectedReturn = new Date(record.expectedReturnTime);
+        const now = new Date();
+        return now > expectedReturn;
+    }
+    return false;
+}
+
+// 渲染借用历史
+function renderBorrowHistory(history, labIndex) {
+    if (!history || history.length === 0) {
+        return '<div class="no-history">暂无借用记录</div>';
+    }
+
+    return history.map((record, recordIndex) => {
+        const isOverdue = checkOverdue(record);
+        return `
+        <div class="borrow-record ${isOverdue ? 'overdue' : ''}">
+            <div>借出时间：${formatDateTime(record.borrowTime)}</div>
+            <div>借出人：${record.borrower}</div>
+            <div class="borrowed-equipment">
+                <h4>借出器材：</h4>
+                ${record.equipment ? record.equipment.map(item => `
+                    <div class="equipment-detail">
+                        <span>名称：${item.name}</span>
+                        <span>型号：${item.model}</span>
+                        <span>数量：${item.quantity}${item.unit || '个'}</span>
+                    </div>
+                `).join('') : '无器材记录'}
+            </div>
+            <div>预计归还：${formatDateTime(record.expectedReturnTime)}</div>
+            ${!record.returnStatus || record.returnStatus !== 'confirmed' ? 
+                isOverdue ? `<div class="status-tag overdue">逾期未还</div>` : 
+                `<div class="status-tag">未归还</div>`
+            : ''}
+            ${record.returnTime ? `
+                <div>归还时间：${formatDateTime(record.returnTime)}</div>
+                <div>归还人：${record.returner}</div>
+                ${record.returnNote ? `<div>备注：${record.returnNote}</div>` : ''}
+                ${record.returnStatus === 'confirmed' ? 
+                    `<div class="status-tag confirmed">已归还</div>` : 
+                    `<div class="status-tag pending">待确认</div>`
+                }
+            ` : `
+                <button class="btn btn-success btn-sm" onclick="confirmReturn(${labIndex}, ${recordIndex})">确认归还</button>
+            `}
+        </div>
+    `}).join('');
+}
+
+// 格式化日期时间
+function formatDateTime(dateTimeStr) {
+    const date = new Date(dateTimeStr);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 // 渲染实训室列表
@@ -243,60 +222,331 @@ function renderLabs() {
 
     labGrid.innerHTML = '';
     labData.forEach((lab, index) => {
+        // 检查是否有逾期记录
+        const hasOverdue = lab.borrowHistory && lab.borrowHistory.some(record => checkOverdue(record));
+        
+        // 更新实训室状态
+        const status = updateLabStatus(lab);
+        lab.status = status;
+
         const labCard = document.createElement('div');
-        labCard.className = `lab-card status-${lab.status}`;
+        labCard.className = `lab-card status-${status} ${hasOverdue ? 'has-overdue' : ''}`;
         labCard.innerHTML = `
             <h3>${lab.name}</h3>
-            <p>状态: <span class="status-text">${getStatusText(lab.status, lab)}</span></p>
-            <div class="equipment-list">
+            <p>状态: <span class="status-text ${status}">${getStatusText(status)}</span></p>
+            ${status === 'occupied' ? `<p class="current-user">使用人：${lab.currentUser}</p>` : ''}
+            ${status === 'borrowed' ? `
+                <p class="current-user">借用人：${lab.currentBorrower}</p>
+                ${hasOverdue ? '<p class="overdue-warning">⚠️ 存在逾期未还</p>' : ''}
+            ` : ''}
+            <div class="equipment-list" style="display: none;">
                 <h4>设备列表：</h4>
                 <ul>
-                    ${lab.equipment.map((item, i) => `<li>${i + 1}. ${item}</li>`).join('')}
+                    ${(lab.equipment || []).map((item, i) => `<li>${i + 1}. ${item}</li>`).join('')}
                 </ul>
             </div>
-            <div class="reservation-info">
+            <button class="btn btn-info btn-sm" onclick="toggleEquipment(${index})">查看设备</button>
+            <div class="reservation-info" style="display: none;">
                 <h4>预约信息：</h4>
                 ${renderReservations(lab.reservations || [])}
             </div>
-            <button class="reserve-btn" onclick="openReservation(${index})">预约使用</button>
+            <button class="btn btn-info btn-sm" onclick="toggleReservation(${index})">查看预约</button>
             <div class="button-group">
+                <button class="btn btn-primary" onclick="openBorrowManagement(${index})">借出</button>
+                <button class="btn btn-primary" onclick="openReservation(${index})">预约</button>
                 <button class="btn btn-primary" onclick="editLab(${index})">编辑</button>
                 <button class="btn btn-danger" onclick="deleteLab(${index})">删除</button>
             </div>
         `;
-
-        labCard.addEventListener('click', (e) => {
-            if (!e.target.closest('.button-group') && !e.target.closest('.reserve-btn')) {
-                if (!labCard.classList.contains('show-equipment')) {
-                    labCard.classList.add('show-equipment');
-                } else {
-                    labCard.classList.remove('show-equipment');
-                }
-            }
-        });
-
         labGrid.appendChild(labCard);
     });
-    
+
+    // 保存更新后的状态
     localStorage.setItem('labData', JSON.stringify(labData));
+}
+
+// 获取状态文本
+function getStatusText(status) {
+    const statusMap = {
+        free: '空闲',
+        reserved: '未来有预约',
+        'today-reserved': '今天有预约',
+        occupied: '使用中',
+        borrowed: '已借出'
+    };
+    return statusMap[status] || status;
+}
+
+// 获取星期几的函数
+function getWeekDay(dateString) {
+    const date = new Date(dateString);
+    const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    return weekDays[date.getDay()];
 }
 
 // 渲染预约信息
 function renderReservations(reservations) {
     if (!reservations || reservations.length === 0) {
-        return '<div class="reservation-item">暂无预约</div>';
+        return '<div class="no-reservations">暂无预约</div>';
     }
-    return reservations
-        .sort((a, b) => new Date(a.date + ' ' + CLASS_TIMES[a.classTime].start) - new Date(b.date + ' ' + CLASS_TIMES[b.classTime].start))
-        .map(reservation => `
+
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    // 过滤出当天和未来的预约
+    const validReservations = reservations.filter(reservation => {
+        if (reservation.date === today) {
+            const timeRange = getTimeRange(reservation.time);
+            return currentTime <= timeRange.end;
+        }
+        return reservation.date > today;
+    });
+
+    if (validReservations.length === 0) {
+        return '<div class="no-reservations">暂无预约</div>';
+    }
+
+    // 按日期和时间排序
+    validReservations.sort((a, b) => {
+        if (a.date !== b.date) {
+            return a.date.localeCompare(b.date);
+        }
+        return getTimeRange(a.time).start - getTimeRange(b.time).start;
+    });
+
+    return validReservations.map(reservation => {
+        const timeRange = getTimeRange(reservation.time);
+        let status = '未开始';
+        let statusColor = '#ffc107';
+        
+        if (reservation.date === today) {
+            if (currentTime >= timeRange.start && currentTime <= timeRange.end) {
+                status = '使用中';
+                statusColor = '#28a745';
+            }
+        } else {
+            const weekDay = getWeekDay(reservation.date);
+            status = `${weekDay}预约使用`;
+            statusColor = '#ffc107';
+        }
+
+        return `
             <div class="reservation-item">
-                <div class="reservation-date">${formatDate(reservation.date)}</div>
-                <div class="reservation-time">${getClassTimeText(reservation.classTime)}</div>
-                <div class="reservation-person">预约人：${reservation.person}</div>
-                ${reservation.purpose ? `<div class="reservation-purpose">用途：${reservation.purpose}</div>` : ''}
+                <div>日期：${reservation.date}</div>
+                <div>时间：${reservation.time}</div>
+                <div>预约人：${reservation.person}</div>
+                ${reservation.purpose ? `<div>用途：${reservation.purpose}</div>` : ''}
+                <div style="color: ${statusColor}">状态：${status}</div>
             </div>
-        `).join('');
+        `;
+    }).join('');
 }
+
+// 处理实训室表单提交
+function handleLabSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const editIndex = parseInt(form.dataset.editIndex);
+
+    const labInfo = {
+        name: document.getElementById('labName').value.trim(),
+        status: document.getElementById('labStatus').value,
+        equipment: document.getElementById('labEquipment').value
+            .split('\n')
+            .map(item => item.trim())
+            .filter(item => item !== '')
+    };
+
+    if (editIndex >= 0) {
+        labData[editIndex] = {
+            ...labData[editIndex],
+            ...labInfo
+        };
+    } else {
+        labData.push(labInfo);
+    }
+
+    localStorage.setItem('labData', JSON.stringify(labData));
+    renderLabs();
+    document.getElementById('labModal').style.display = 'none';
+    form.reset();
+}
+
+// 处理预约提交
+function handleReservationSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const labIndex = parseInt(form.dataset.labIndex);
+    
+    if (isNaN(labIndex) || labIndex < 0 || labIndex >= labData.length) {
+        alert('系统错误：未找到实训室信息');
+        return;
+    }
+
+    const reservation = {
+        date: document.getElementById('reservationDate').value,
+        time: document.getElementById('classTime').value,
+        person: document.getElementById('reservationPerson').value.trim(),
+        purpose: document.getElementById('reservationPurpose').value.trim()
+    };
+
+    if (!reservation.date || !reservation.time || !reservation.person) {
+        alert('请填写完整的预约信息');
+        return;
+    }
+
+    const lab = labData[labIndex];
+    if (!lab.reservations) {
+        lab.reservations = [];
+    }
+
+    lab.reservations.push(reservation);
+    localStorage.setItem('labData', JSON.stringify(labData));
+    renderLabs();
+    
+    document.getElementById('reservationModal').style.display = 'none';
+    form.reset();
+}
+
+// 页面加载的初始化
+document.addEventListener('DOMContentLoaded', () => {
+    // 清除可能存在的旧登录状态
+    if (window.location.pathname.toLowerCase().includes('index.html') || 
+        window.location.pathname.endsWith('/')) {
+        localStorage.removeItem('isLoggedIn');
+    }
+
+    // 检查登录状态
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const isLoginPage = window.location.pathname.toLowerCase().includes('index.html') || 
+                       window.location.pathname.endsWith('/');
+    const isDashboard = window.location.pathname.toLowerCase().includes('dashboard.html');
+
+    if (!isLoggedIn && isDashboard) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    if (isLoggedIn && isLoginPage) {
+        window.location.href = 'dashboard.html';
+        return;
+    }
+
+    // 获取登录表单
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+        return;
+    }
+
+    // 如果是 dashboard 页面且已登录，初始化功能
+    if (isDashboard && isLoggedIn) {
+        // 渲染实训室列表
+        renderLabs();
+
+        // 每分钟更新一次状态
+        setInterval(renderLabs, 60000);
+
+        // 绑定按钮事件
+        document.getElementById('addLabBtn').addEventListener('click', () => {
+            showAdminAuth(() => {
+                document.getElementById('modalTitle').textContent = '添加实训室';
+                document.getElementById('labForm').reset();
+                document.getElementById('labModal').style.display = 'block';
+            });
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.clear(); // 清除所有本地存储数据
+                window.location.href = 'index.html';
+            }
+        });
+
+        // 绑定表单事件
+        document.getElementById('labForm').addEventListener('submit', handleLabSubmit);
+        document.getElementById('reservationForm').addEventListener('submit', handleReservationSubmit);
+
+        // 绑定取消按钮事件
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            document.getElementById('labModal').style.display = 'none';
+        });
+
+        document.getElementById('cancelReservationBtn').addEventListener('click', () => {
+            document.getElementById('reservationModal').style.display = 'none';
+        });
+
+        // 绑定借出和归还表单事件
+        document.getElementById('borrowForm').addEventListener('submit', handleBorrowSubmit);
+        document.getElementById('returnForm').addEventListener('submit', handleReturnSubmit);
+
+        // 绑定取消按钮事件
+        document.getElementById('cancelBorrowBtn').addEventListener('click', () => {
+            document.getElementById('borrowModal').style.display = 'none';
+        });
+
+        document.getElementById('cancelReturnBtn').addEventListener('click', () => {
+            document.getElementById('returnModal').style.display = 'none';
+        });
+
+        // 添加器材按钮事件
+        const addEquipmentBtn = document.getElementById('addEquipmentBtn');
+        if (addEquipmentBtn) {
+            addEquipmentBtn.addEventListener('click', addEquipmentRow);
+        }
+
+        // 绑定汇总按钮事件
+        document.getElementById('summaryReservationBtn').addEventListener('click', () => {
+            const summaryContent = document.getElementById('reservationSummaryContent');
+            summaryContent.innerHTML = generateReservationSummary();
+            document.getElementById('summaryReservationModal').style.display = 'block';
+        });
+
+        document.getElementById('summaryBorrowBtn').addEventListener('click', () => {
+            const summaryContent = document.getElementById('borrowSummaryContent');
+            summaryContent.innerHTML = generateBorrowSummary();
+            document.getElementById('summaryBorrowModal').style.display = 'block';
+        });
+
+        // 绑定关闭按钮事件
+        document.getElementById('closeSummaryReservationBtn').addEventListener('click', () => {
+            document.getElementById('summaryReservationModal').style.display = 'none';
+        });
+
+        document.getElementById('closeSummaryBorrowBtn').addEventListener('click', () => {
+            document.getElementById('summaryBorrowModal').style.display = 'none';
+        });
+
+        // 绑定导出按钮事件
+        document.getElementById('exportDataBtn').addEventListener('click', exportData);
+        
+        // 绑定导入按钮事件
+        document.getElementById('importDataBtn').addEventListener('click', () => {
+            document.getElementById('importFile').click();
+        });
+        
+        document.getElementById('importFile').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                importData(e.target.files[0]);
+                e.target.value = ''; // 清除选择的文件，允许重复导入相同文件
+            }
+        });
+    }
+});
+
+// 打开预约模态框
+window.openReservation = function(index) {
+    const reservationModal = document.getElementById('reservationModal');
+    const reservationForm = document.getElementById('reservationForm');
+    
+    // 设置最小日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('reservationDate').min = today;
+    
+    reservationForm.dataset.labIndex = index;
+    reservationModal.style.display = 'block';
+};
 
 // 编辑实训室
 window.editLab = function(index) {
@@ -304,367 +554,570 @@ window.editLab = function(index) {
         const lab = labData[index];
         document.getElementById('modalTitle').textContent = '编辑实训室';
         document.getElementById('labName').value = lab.name;
-        document.getElementById('labStatus').value = lab.status;
-        document.getElementById('labEquipment').value = lab.equipment.join('\n');
-        labForm.dataset.editIndex = index;
+        document.getElementById('labStatus').value = lab.status || 'free';
+        document.getElementById('labEquipment').value = (lab.equipment || []).join('\n');
+        document.getElementById('labForm').dataset.editIndex = index;
 
-        const reservationManagement = document.querySelector('.reservation-management');
-        reservationManagement.style.display = 'block';
+        // 添加预约和借用管理部分
+        const managementContent = document.createElement('div');
+        managementContent.className = 'management-content';
+        managementContent.innerHTML = `
+            <div class="reservation-management">
+                <h3>预约管理</h3>
+                <div class="reservation-list">
+                    ${(lab.reservations || []).map((reservation, resIndex) => `
+                        <div class="reservation-item">
+                            <div>日期：${reservation.date}</div>
+                            <div>时间：${reservation.time}</div>
+                            <div>预约人：${reservation.person}</div>
+                            ${reservation.purpose ? `<div>用途：${reservation.purpose}</div>` : ''}
+                            <button class="btn btn-danger btn-sm" onclick="deleteReservation(${index}, ${resIndex})">删除预约</button>
+                        </div>
+                    `).join('') || '<div class="no-reservations">暂无预约</div>'}
+                </div>
+            </div>
+            <div class="borrow-management">
+                <h3>借用管理</h3>
+                <div class="borrow-list">
+                    ${(lab.borrowHistory || []).map((record, recordIndex) => `
+                        <div class="borrow-record">
+                            <div>借出时间：${formatDateTime(record.borrowTime)}</div>
+                            <div>借出人：${record.borrower}</div>
+                            <div>预计归还：${formatDateTime(record.expectedReturnTime)}</div>
+                            ${record.returnTime ? `
+                                <div>归还时间：${formatDateTime(record.returnTime)}</div>
+                                <div>归还人：${record.returner}</div>
+                                ${record.returnNote ? `<div>备注：${record.returnNote}</div>` : ''}
+                            ` : '<div class="status-tag">未归还</div>'}
+                            <button class="btn btn-danger btn-sm" onclick="deleteBorrowRecord(${index}, ${recordIndex})">删除记录</button>
+                        </div>
+                    `).join('') || '<div class="no-history">暂无借用记录</div>'}
+                </div>
+            </div>
+        `;
 
-        renderEditReservations(lab.reservations || [], index);
+        const modalContent = document.querySelector('#labModal .modal-content');
+        const existingManagement = modalContent.querySelector('.management-content');
+        if (existingManagement) {
+            existingManagement.remove();
+        }
+        modalContent.appendChild(managementContent);
 
-        labModal.style.display = 'block';
+        document.getElementById('labModal').style.display = 'block';
     });
+};
+
+// 删除预约
+window.deleteReservation = function(labIndex, reservationIndex) {
+    if (confirm('确定要删除这条预约记录吗？')) {
+        labData[labIndex].reservations.splice(reservationIndex, 1);
+        localStorage.setItem('labData', JSON.stringify(labData));
+        
+        // 新渲染预约管理部分
+        const lab = labData[labIndex];
+        const reservationList = document.querySelector('.reservation-list');
+        reservationList.innerHTML = (lab.reservations || []).map((reservation, resIndex) => `
+            <div class="reservation-item">
+                <div>日期：${reservation.date}</div>
+                <div>时间：${reservation.time}</div>
+                <div>预约人：${reservation.person}</div>
+                ${reservation.purpose ? `<div>用途：${reservation.purpose}</div>` : ''}
+                <button class="btn btn-danger btn-sm" onclick="deleteReservation(${labIndex}, ${resIndex})">删除预约</button>
+            </div>
+        `).join('') || '<div class="no-reservations">暂无预约</div>';
+
+        // 更新主界面显示
+        renderLabs();
+    }
 };
 
 // 删除实训室
 window.deleteLab = function(index) {
-    showAdminAuth(async () => {
-        if (confirm('确定要删除这个实训室吗？')) {
-            const lab = labData[index];
-            if (lab.id) {
-                try {
-                    const labObj = AV.Object.createWithoutData('Lab', lab.id);
-                    await labObj.destroy();
-                } catch (error) {
-                    console.error('删除失败:', error);
-                }
-            }
+    showAdminAuth(() => {
+        if (confirm('确定要删除这个实训室吗？此操作不可恢复。')) {
             labData.splice(index, 1);
+            localStorage.setItem('labData', JSON.stringify(labData));
             renderLabs();
         }
     });
 };
 
-// 打开预约模态框
-window.openReservation = function(index) {
-    const reservationModal = document.getElementById('reservationModal');
-    const reservationForm = document.getElementById('reservationForm');
-    const cancelReservationBtn = document.getElementById('cancelReservationBtn');
+// 切换设备列表显示
+window.toggleEquipment = function(index) {
+    const labCard = document.querySelectorAll('.lab-card')[index];
+    const equipmentList = labCard.querySelector('.equipment-list');
+    const toggleBtn = labCard.querySelector('.btn-info:nth-of-type(1)');
 
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('reservationDate').min = today;
-
-    reservationForm.dataset.labIndex = index;
-    reservationModal.style.display = 'block';
-
-    cancelReservationBtn.onclick = () => {
-        reservationModal.style.display = 'none';
-        reservationForm.reset();
-    };
-
-    reservationForm.onsubmit = handleReservationSubmit;
+    if (equipmentList.style.display === 'none') {
+        equipmentList.style.display = 'block';
+        toggleBtn.textContent = '隐藏设备';
+    } else {
+        equipmentList.style.display = 'none';
+        toggleBtn.textContent = '查看设备';
+    }
 };
 
-// 处理预约提交
-function handleReservationSubmit(e) {
+// 打开借出模态框
+window.openBorrow = function(index) {
+    showAdminAuth(() => {
+        const borrowModal = document.getElementById('borrowModal');
+        const borrowForm = document.getElementById('borrowForm');
+        
+        // 设置当前时间为默认值
+        const now = new Date();
+        document.getElementById('borrowTime').value = now.toISOString().slice(0, 16);
+        
+        borrowForm.dataset.labIndex = index;
+        borrowModal.style.display = 'block';
+    });
+};
+
+// 打开归还模态框
+window.openReturn = function(index) {
+    showAdminAuth(() => {
+        const returnModal = document.getElementById('returnModal');
+        const returnForm = document.getElementById('returnForm');
+        
+        // 设置当前时间为默认值
+        const now = new Date();
+        document.getElementById('returnTime').value = now.toISOString().slice(0, 16);
+        
+        returnForm.dataset.labIndex = index;
+        returnModal.style.display = 'block';
+    });
+};
+
+// 处理借出表单提交
+function handleBorrowSubmit(e) {
     e.preventDefault();
-    const labIndex = e.target.dataset.labIndex;
-    const reservation = {
-        date: document.getElementById('reservationDate').value,
-        classTime: document.getElementById('classTime').value,
-        person: document.getElementById('reservationPerson').value,
-        purpose: document.getElementById('reservationPurpose').value
+    const form = e.target;
+    const labIndex = parseInt(form.dataset.labIndex);
+    
+    if (isNaN(labIndex) || labIndex < 0 || labIndex >= labData.length) {
+        alert('系统错误：未找到实训室信息');
+        return;
+    }
+
+    const equipmentList = [];
+    form.querySelectorAll('.equipment-item').forEach(item => {
+        equipmentList.push({
+            name: item.querySelector('input[placeholder="器材名称"]').value.trim(),
+            model: item.querySelector('input[placeholder="型号"]').value.trim(),
+            quantity: item.querySelector('input[placeholder="数量"]').value,
+            unit: item.querySelector('.unit-select').value
+        });
+    });
+
+    const borrowRecord = {
+        borrowTime: document.getElementById('borrowTime').value,
+        borrower: document.getElementById('borrower').value.trim(),
+        expectedReturnTime: document.getElementById('expectedReturnTime').value,
+        equipment: equipmentList
     };
 
-    if (!labData[labIndex].reservations) {
-        labData[labIndex].reservations = [];
+    const lab = labData[labIndex];
+    if (!lab.borrowHistory) {
+        lab.borrowHistory = [];
     }
 
-    const hasConflict = checkTimeConflict(labData[labIndex].reservations, reservation);
-    if (hasConflict) {
-        alert('该时间段已被预约，请选择其他时间！');
-        return;
-    }
-
-    labData[labIndex].reservations.push(reservation);
-    updateLabStatus(labIndex);
-    renderLabs();
-    document.getElementById('reservationModal').style.display = 'none';
-    e.target.reset();
-}
-
-// 检查时间冲突
-function checkTimeConflict(existingReservations, newReservation) {
-    return existingReservations.some(existing => 
-        existing.date === newReservation.date && 
-        existing.classTime === newReservation.classTime
-    );
-}
-
-// 获取当前课节
-function getCurrentClassTime() {
-    const now = new Date();
-    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
-                      now.getMinutes().toString().padStart(2, '0');
-
-    for (const [classTime, times] of Object.entries(CLASS_TIMES)) {
-        if (currentTime >= times.start && currentTime < times.end) {
-            return classTime;
-        }
-    }
-    return null;
-}
-
-// 更新实训室状态
-function updateLabStatus(index) {
-    const lab = labData[index];
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const currentClassTime = getCurrentClassTime();
-
-    if (!lab.reservations || lab.reservations.length === 0) {
-        lab.status = 'free';
-        return;
-    }
-
-    lab.reservations = lab.reservations.filter(reservation => {
-        const reservationDate = new Date(reservation.date);
-        const reservationEndTime = CLASS_TIMES[reservation.classTime].end;
-        const reservationDateTime = new Date(
-            reservation.date + 'T' + reservationEndTime
-        );
-        return reservationDateTime > now;
-    });
-
-    if (lab.reservations.length === 0) {
-        lab.status = 'free';
-        return;
-    }
-
-    const currentReservation = lab.reservations.find(reservation => 
-        reservation.date === today && reservation.classTime === currentClassTime
-    );
-
-    const futureReservation = lab.reservations.find(reservation => {
-        const reservationDate = reservation.date;
-        if (reservationDate > today) return true;
-        if (reservationDate === today) {
-            const reservationStartTime = CLASS_TIMES[reservation.classTime].start;
-            const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
-                             now.getMinutes().toString().padStart(2, '0');
-            return reservationStartTime > currentTime;
-        }
-        return false;
-    });
-
-    if (currentReservation) {
-        lab.status = 'occupied';
-    } else if (futureReservation) {
-        lab.status = 'reserved';
-    } else {
-        lab.status = 'free';
-    }
+    lab.borrowHistory.push(borrowRecord);
+    lab.status = 'borrowed';
+    lab.currentBorrower = borrowRecord.borrower;
 
     localStorage.setItem('labData', JSON.stringify(labData));
+    renderLabs();
+    
+    document.getElementById('borrowModal').style.display = 'none';
+    form.reset();
 }
 
-// 显示汇总信息
-function showSummary() {
-    const startDate = document.getElementById('summaryStartDate').value;
-    const endDate = document.getElementById('summaryEndDate').value;
-    const summaryContent = document.getElementById('summaryContent');
-
-    const allReservations = [];
-    labData.forEach(lab => {
-        if (lab.reservations) {
-            lab.reservations.forEach(reservation => {
-                if (reservation.date >= startDate && reservation.date <= endDate) {
-                    allReservations.push({
-                        person: reservation.person,
-                        date: reservation.date,
-                        classTime: reservation.classTime,
-                        labName: lab.name
-                    });
-                }
-            });
-        }
-    });
-
-    const groupedReservations = {};
-    allReservations.forEach(reservation => {
-        if (!groupedReservations[reservation.person]) {
-            groupedReservations[reservation.person] = [];
-        }
-        groupedReservations[reservation.person].push(reservation);
-    });
-
-    if (Object.keys(groupedReservations).length === 0) {
-        summaryContent.innerHTML = '<div class="summary-group"><p>所选日期范围内没有预约记录</p></div>';
+// 处理归还表单提交
+function handleReturnSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const labIndex = parseInt(form.dataset.labIndex);
+    
+    if (isNaN(labIndex) || labIndex < 0 || labIndex >= labData.length) {
+        alert('系统错误：未找到实训室信息');
         return;
     }
 
-    const html = Object.entries(groupedReservations)
-        .sort(([personA], [personB]) => personA.localeCompare(personB))
-        .map(([person, reservations]) => `
-            <div class="summary-group">
-                <h3>${person}</h3>
-                ${reservations
-                    .sort((a, b) => a.date.localeCompare(b.date) || a.classTime.localeCompare(b.classTime))
-                    .map(r => `
-                        <div class="summary-item">
-                            <span class="summary-date">${formatDate(r.date)}</span>
-                            <span class="summary-lab">${r.labName}</span>
-                            <span class="summary-time">${getClassTimeText(r.classTime)}</span>
-                        </div>
-                    `).join('')}
-            </div>
-        `).join('');
+    const lab = labData[labIndex];
+    const currentBorrowRecord = lab.borrowHistory[lab.borrowHistory.length - 1];
 
-    summaryContent.innerHTML = html;
+    currentBorrowRecord.returnTime = document.getElementById('returnTime').value;
+    currentBorrowRecord.returner = document.getElementById('returner').value.trim();
+    currentBorrowRecord.returnNote = document.getElementById('returnNote').value.trim();
+    currentBorrowRecord.returnStatus = 'pending';
+
+    localStorage.setItem('labData', JSON.stringify(labData));
+    renderLabs();
+    
+    document.getElementById('returnModal').style.display = 'none';
+    form.reset();
+    alert('归还申请已提交，等待管理员确认');
 }
 
-// 定义 Lab 类
-const Lab = AV.Object.extend('Lab');
-
-// 加载实训室数据
-async function loadLabData() {
-    try {
-        // 从云端加载数据
-        const query = new AV.Query('Lab');
-        const results = await query.find();
-        
-        if (results && results.length > 0) {
-            // 使用云端数据
-            labData = results.map(lab => ({
-                id: lab.id,
-                name: lab.get('name'),
-                status: lab.get('status'),
-                equipment: lab.get('equipment') || [],
-                reservations: lab.get('reservations') || []
-            }));
-        } else {
-            // 如果云端没有数据，使用本地数据
-            const localData = localStorage.getItem('labData');
-            if (localData) {
-                labData = JSON.parse(localData);
-                // 上传本地数据到云端
-                await syncLocalDataToCloud();
+// 删除借用记录
+window.deleteBorrowRecord = function(labIndex, recordIndex) {
+    showAdminAuth(() => {
+        if (confirm('确定要删除这条借用记录吗？')) {
+            const lab = labData[labIndex];
+            lab.borrowHistory.splice(recordIndex, 1);
+            
+            // 如果删除的是最后一条未归还的记录，更新实训室状态
+            if (recordIndex === lab.borrowHistory.length && lab.status === 'borrowed') {
+                lab.status = 'free';
+                delete lab.currentBorrower;
             }
-        }
-        renderLabs();
-    } catch (error) {
-        console.error('数据加载失败:', error);
-        // 如果云端加载失败，使用本地数据
-        const localData = localStorage.getItem('labData');
-        if (localData) {
-            labData = JSON.parse(localData);
+            
+            localStorage.setItem('labData', JSON.stringify(labData));
+            
+            // 重新渲染借用管理部分
+            const borrowList = document.querySelector('.borrow-list');
+            if (borrowList) {
+                borrowList.innerHTML = (lab.borrowHistory || []).map((record, recIndex) => `
+                    <div class="borrow-record">
+                        <div>借出时间：${formatDateTime(record.borrowTime)}</div>
+                        <div>借出人：${record.borrower}</div>
+                        <div>预计归还：${formatDateTime(record.expectedReturnTime)}</div>
+                        ${record.returnTime ? `
+                            <div>归还时间：${formatDateTime(record.returnTime)}</div>
+                            <div>归还人：${record.returner}</div>
+                            ${record.returnNote ? `<div>备注：${record.returnNote}</div>` : ''}
+                        ` : '<div class="status-tag">未归还</div>'}
+                        <button class="btn btn-danger btn-sm" onclick="deleteBorrowRecord(${labIndex}, ${recIndex})">删除记录</button>
+                    </div>
+                `).join('') || '<div class="no-history">暂无借用记录</div>';
+            }
+            
+            // 更新主界面显示
             renderLabs();
         }
-    }
-}
+    });
+};
 
-// 同步本地数据到云端
-async function syncLocalDataToCloud() {
-    try {
-        for (const lab of labData) {
-            const labObj = new Lab();
-            labObj.set('name', lab.name);
-            labObj.set('status', lab.status);
-            labObj.set('equipment', lab.equipment);
-            labObj.set('reservations', lab.reservations);
-            const savedLab = await labObj.save();
-            lab.id = savedLab.id;
-        }
-        console.log('本地数据已同步到云端');
-    } catch (error) {
-        console.error('数据同步失败:', error);
-    }
-}
-
-// 保存实训室数据
-async function saveLabs() {
-    try {
-        // 保存到本地（作为备份）
-        localStorage.setItem('labData', JSON.stringify(labData));
-
-        // 保存到云端
-        for (const lab of labData) {
-            if (lab.id) {
-                // 更新现有数据
-                const labObj = AV.Object.createWithoutData('Lab', lab.id);
-                labObj.set('name', lab.name);
-                labObj.set('status', lab.status);
-                labObj.set('equipment', lab.equipment);
-                labObj.set('reservations', lab.reservations);
-                await labObj.save();
-            } else {
-                // 创建新数据
-                const labObj = new Lab();
-                labObj.set('name', lab.name);
-                labObj.set('status', lab.status);
-                labObj.set('equipment', lab.equipment);
-                labObj.set('reservations', lab.reservations);
-                const savedLab = await labObj.save();
-                lab.id = savedLab.id;
+// 确认归还
+window.confirmReturn = function(labIndex, recordIndex) {
+    showAdminAuth(() => {
+        const lab = labData[labIndex];
+        const record = lab.borrowHistory[recordIndex];
+        
+        if (confirm('确认归还该设备吗？')) {
+            const now = new Date();
+            record.returnTime = now.toISOString().slice(0, 16);
+            record.returner = '管理员确认';
+            record.returnNote = '管理员确认归还';
+            record.returnStatus = 'confirmed';
+            
+            // 如果是最新的借用记录，更新实训室状态
+            if (recordIndex === lab.borrowHistory.length - 1) {
+                lab.status = 'free';
+                delete lab.currentBorrower;
             }
+            
+            localStorage.setItem('labData', JSON.stringify(labData));
+            
+            // 更新当前显示的借用记录
+            const borrowHistorySection = document.querySelector('.borrow-history-section');
+            if (borrowHistorySection) {
+                borrowHistorySection.innerHTML = `
+                    <h3>借用记录</h3>
+                    ${renderBorrowHistory(lab.borrowHistory || [], labIndex)}
+                `;
+            }
+            
+            // 更新主界面显示
+            renderLabs();
+            alert('设备已归还');
         }
-    } catch (error) {
-        console.error('保存失败:', error);
-    }
+    });
+};
+
+// 管理员提前归还
+window.adminReturn = function(labIndex, recordIndex) {
+    showAdminAuth(() => {
+        const lab = labData[labIndex];
+        const record = lab.borrowHistory[recordIndex];
+        
+        if (confirm('确定要执行管理员归还操作吗？')) {
+            const now = new Date();
+            record.returnTime = now.toISOString().slice(0, 16);
+            record.returner = '管理员操作';
+            record.returnNote = '管理员提前归还';
+            record.returnStatus = 'confirmed';
+            
+            // 如果是最新的借用记录，更新实训室状态
+            if (recordIndex === lab.borrowHistory.length - 1) {
+                lab.status = 'free';
+                delete lab.currentBorrower;
+            }
+            
+            localStorage.setItem('labData', JSON.stringify(labData));
+            renderLabs();
+            alert('管理员归还操作已完成');
+        }
+    });
+};
+
+// 打开借出管理模态框
+window.openBorrowManagement = function(index) {
+    showAdminAuth(() => {
+        const lab = labData[index];
+        const borrowModal = document.getElementById('borrowModal');
+        const modalContent = borrowModal.querySelector('.modal-content');
+        
+        // 添加借用历史到模态框
+        const historySection = document.createElement('div');
+        historySection.className = 'borrow-history-section';
+        historySection.innerHTML = `
+            <h3>借用记录</h3>
+            ${renderBorrowHistory(lab.borrowHistory || [], index)}
+        `;
+
+        // 清除之前的历史记录部分
+        const existingHistory = modalContent.querySelector('.borrow-history-section');
+        if (existingHistory) {
+            existingHistory.remove();
+        }
+
+        // 如果实训室已被借出，显示归还表单，否则显示借出表单
+        const borrowForm = document.getElementById('borrowForm');
+        const returnForm = document.getElementById('returnForm');
+        
+        if (lab.status === 'borrowed') {
+            borrowForm.style.display = 'none';
+            returnForm.style.display = 'block';
+            modalContent.querySelector('h2').textContent = '实训室归还/管理';
+            
+            // 设置当前时间为默认值
+            const now = new Date();
+            document.getElementById('returnTime').value = now.toISOString().slice(0, 16);
+            returnForm.dataset.labIndex = index;
+        } else {
+            borrowForm.style.display = 'block';
+            returnForm.style.display = 'none';
+            modalContent.querySelector('h2').textContent = '实训室借出/管理';
+            
+            // 设置当前时间为默认值
+            const now = new Date();
+            document.getElementById('borrowTime').value = now.toISOString().slice(0, 16);
+            borrowForm.dataset.labIndex = index;
+        }
+
+        modalContent.appendChild(historySection);
+        borrowModal.style.display = 'block';
+    });
+};
+
+// 添加器材输入行
+function addEquipmentRow() {
+    const equipmentList = document.getElementById('borrowEquipmentList');
+    const newItem = document.createElement('div');
+    newItem.className = 'equipment-item';
+    newItem.innerHTML = `
+        <div class="input-group">
+            <label>器材名称：</label>
+            <input type="text" class="equipment-name" required>
+        </div>
+        <div class="input-group">
+            <label>型号：</label>
+            <input type="text" class="equipment-model" required>
+        </div>
+        <div class="input-group">
+            <label>数量：</label>
+            <input type="number" class="equipment-quantity" min="1" required>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm remove-equipment">删除</button>
+    `;
+    equipmentList.appendChild(newItem);
+
+    // 添加删除按钮事件
+    newItem.querySelector('.remove-equipment').addEventListener('click', function() {
+        newItem.remove();
+    });
 }
 
-// 渲染编辑模式下的预约列表
-function renderEditReservations(reservations, labIndex) {
-    const editReservationList = document.getElementById('editReservationList');
-    if (!reservations || reservations.length === 0) {
-        editReservationList.innerHTML = '<div class="no-reservations">无预约记录</div>';
-        return;
-    }
+// 生成预约汇总
+function generateReservationSummary() {
+    // 按实训室分组
+    const summary = labData.map(lab => {
+        return {
+            labName: lab.name,
+            labIndex: labData.indexOf(lab),
+            reservations: lab.reservations || []
+        };
+    }).filter(item => item.reservations.length > 0);
 
-    const sortedReservations = [...reservations].sort((a, b) => 
-        new Date(a.date + ' ' + CLASS_TIMES[a.classTime].start) - 
-        new Date(b.date + ' ' + CLASS_TIMES[b.classTime].start)
-    );
+    // 按实训室名称排序
+    summary.sort((a, b) => a.labName.localeCompare(b.labName));
 
-    editReservationList.innerHTML = sortedReservations.map((reservation, index) => `
-        <div class="edit-reservation-item">
-            <div class="reservation-info-group">
-                <div class="reservation-date">${formatDate(reservation.date)}</div>
-                <div class="reservation-time">${getClassTimeText(reservation.classTime)}</div>
-                <div class="reservation-person">预约人：${reservation.person}</div>
-                ${reservation.purpose ? `<div class="reservation-purpose">用途：${reservation.purpose}</div>` : ''}
-            </div>
-            <div class="reservation-actions">
-                <button class="btn-delete-reservation" onclick="deleteReservation(${labIndex}, ${index})">删除</button>
-            </div>
+    // 生成HTML
+    return summary.map(item => `
+        <div class="summary-group">
+            <h3>${item.labName}</h3>
+            ${item.reservations.map((reservation, resIndex) => {
+                const now = new Date();
+                const reservationDate = new Date(reservation.date);
+                const timeRange = getTimeRange(reservation.time);
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                const isToday = now.toISOString().split('T')[0] === reservation.date;
+                
+                let status = '未开始';
+                let statusColor = '#ffc107';
+                
+                if (reservationDate < now && !isToday) {
+                    status = '已结束';
+                    statusColor = '#6c757d';
+                } else if (isToday) {
+                    if (currentTime >= timeRange.end) {
+                        status = '已结束';
+                        statusColor = '#6c757d';
+                    } else if (currentTime >= timeRange.start && currentTime <= timeRange.end) {
+                        status = '使用中';
+                        statusColor = '#28a745';
+                    }
+                }
+
+                return `
+                    <div class="summary-item">
+                        <div class="item-header">
+                            预约人：${reservation.person}
+                            <button class="btn btn-danger btn-sm" onclick="deleteReservationRecord(${item.labIndex}, ${resIndex})">删除记录</button>
+                        </div>
+                        <div class="item-detail">日期：${reservation.date}</div>
+                        <div class="item-detail">时间：${reservation.time}</div>
+                        ${reservation.purpose ? `<div class="item-detail">用途：${reservation.purpose}</div>` : ''}
+                        <div class="item-detail" style="color: ${statusColor}">状态：${status}</div>
+                    </div>
+                `;
+            }).join('')}
         </div>
     `).join('');
 }
 
-// 删除预约
-window.deleteReservation = function(labIndex, reservationIndex) {
-    if (confirm('确认要删除这条预约记录吗？')) {
-        labData[labIndex].reservations.splice(reservationIndex, 1);
-        updateLabStatus(labIndex);
-        renderEditReservations(labData[labIndex].reservations, labIndex);
-        renderLabs();
-    }
-}; 
+// 生成借出汇总
+function generateBorrowSummary() {
+    // 按实训室分组
+    const summary = labData.map(lab => {
+        return {
+            labName: lab.name,
+            borrows: lab.borrowHistory || []
+        };
+    }).filter(item => item.borrows.length > 0);
 
-// 初始化 LeanCloud
-AV.init({
-    appId: "你的AppID",
-    appKey: "你的AppKey",
-    serverURL: "https://你的服务器域名"  // 这个需要根据你创建的应用来填写
-});
+    // 按实训室名称排序
+    summary.sort((a, b) => a.labName.localeCompare(b.labName));
 
-// 设置实时更新
-function setupRealtimeUpdate() {
-    // 每30秒自动刷新一次数据
-    setInterval(() => {
-        loadLabData();
-    }, 30000);
+    // 生成HTML
+    return summary.map(item => `
+        <div class="summary-group">
+            <h3>${item.labName}</h3>
+            ${item.borrows.map(borrow => `
+                <div class="summary-item">
+                    <div class="item-header">借出人：${borrow.borrower}</div>
+                    <div class="item-detail">借出时间：${formatDateTime(borrow.borrowTime)}</div>
+                    <div class="item-detail">预计归还：${formatDateTime(borrow.expectedReturnTime)}</div>
+                    ${borrow.returnStatus === 'confirmed' ? 
+                        `<div class="item-detail" style="color: #28a745">状态：已归还</div>
+                         <div class="item-detail">归还时间：${formatDateTime(borrow.returnTime)}</div>
+                         <div class="item-detail">归还人：${borrow.returner}</div>` :
+                        checkOverdue(borrow) ? 
+                            '<div class="item-detail" style="color: #dc3545">状态：逾期未还</div>' : 
+                            '<div class="item-detail" style="color: #ffc107">状态：未归还</div>'
+                    }
+                    <div class="item-detail">借出器材：</div>
+                    ${borrow.equipment ? borrow.equipment.map(equip => `
+                        <div class="item-detail">
+                            - ${equip.name} (${equip.model})
+                            <span class="equipment-count">数量：${equip.quantity}</span>
+                        </div>
+                    `).join('') : ''}
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
 }
 
-// 在页面加载时初始化
-document.addEventListener('DOMContentLoaded', () => {
-    checkLogin();
-    
-    const dashboard = document.querySelector('.dashboard');
-    if (dashboard) {
-        loadLabData();
-        setupRealtimeUpdate();
-        // ... 其他初始化代码 ...
+// 切换预约信息显示
+window.toggleReservation = function(index) {
+    const labCard = document.querySelectorAll('.lab-card')[index];
+    const reservationInfo = labCard.querySelector('.reservation-info');
+    const toggleBtn = labCard.querySelector('.btn-info:nth-of-type(2)');
+
+    if (reservationInfo.style.display === 'none') {
+        reservationInfo.style.display = 'block';
+        toggleBtn.textContent = '隐藏预约';
+    } else {
+        reservationInfo.style.display = 'none';
+        toggleBtn.textContent = '查看预约';
     }
-}); 
+};
+
+// 删除预约记录
+window.deleteReservationRecord = function(labIndex, reservationIndex) {
+    showAdminAuth(() => {
+        if (confirm('确定要删除这条预约记录吗？')) {
+            const lab = labData[labIndex];
+            lab.reservations.splice(reservationIndex, 1);
+            localStorage.setItem('labData', JSON.stringify(labData));
+            
+            // 重新渲染预约汇总
+            const summaryContent = document.getElementById('reservationSummaryContent');
+            if (summaryContent) {
+                summaryContent.innerHTML = generateReservationSummary();
+            }
+            
+            // 更新主界面显示
+            renderLabs();
+        }
+    });
+};
+
+// 导出数据
+window.exportData = function() {
+    showAdminAuth(() => {
+        const data = {
+            labData: labData,
+            timestamp: new Date().toISOString(),
+            version: '1.0'
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `lab_data_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+};
+
+// 导入数据
+window.importData = function(file) {
+    showAdminAuth(() => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                
+                // 验证数据格式
+                if (!importedData.labData || !importedData.timestamp || !importedData.version) {
+                    throw new Error('数据格式不正确');
+                }
+                
+                if (confirm(`确定要导入 ${new Date(importedData.timestamp).toLocaleString()} 的数据吗？这将覆盖当前所有数据。`)) {
+                    labData = importedData.labData;
+                    localStorage.setItem('labData', JSON.stringify(labData));
+                    renderLabs();
+                    alert('数据导入成功！');
+                }
+            } catch (error) {
+                alert('导入失败：' + error.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+};

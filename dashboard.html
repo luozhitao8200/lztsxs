@@ -1,116 +1,35 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>实训室管理系统 - 管理界面</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
 </head>
 <body>
     <div class="dashboard">
         <div class="header">
-            <h1>实训室管理系统</h1>
-            <div class="header-buttons">
-                <button class="btn btn-primary" id="addLabBtn">添加实训室</button>
-                <button class="btn btn-info" id="summaryBtn">使用汇总</button>
-                <button class="btn btn-danger" id="logoutBtn">退出登录</button>
-            </div>
-        </div>
-
-        <div class="lab-grid" id="labGrid">
-            <!-- 实训室卡片将通过JavaScript动态生成 -->
-        </div>
-    </div>
-
-    <!-- 添加/编辑实训室的模态框 -->
-    <div class="modal" id="labModal">
-        <div class="modal-content modal-large">
-            <h2 id="modalTitle">添加实训室</h2>
-            <form id="labForm">
-                <div class="input-group">
-                    <input type="text" id="labName" required placeholder="实训室名称">
-                </div>
-                <div class="input-group">
-                    <select id="labStatus" required>
-                        <option value="free">空闲</option>
-                        <option value="reserved">已预约</option>
-                        <option value="occupied">使用中</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <textarea id="labEquipment" placeholder="设备列表（每行一个）"></textarea>
-                </div>
-                <div class="reservation-management" style="display: none;">
-                    <h3>预约管理</h3>
-                    <div class="reservation-list" id="editReservationList">
-                        <!-- 预约列表将通过JavaScript动态生成 -->
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button type="submit" class="btn btn-primary">保存</button>
-                    <button type="button" class="btn btn-danger" id="cancelBtn">取消</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 预约日历模态框 -->
-    <div class="modal" id="reservationModal">
-        <div class="modal-content">
-            <h2>预约实训室</h2>
-            <form id="reservationForm">
-                <div class="input-group">
-                    <label>预约日期：</label>
-                    <input type="date" id="reservationDate" required>
-                </div>
-                <div class="input-group">
-                    <label>课节：</label>
-                    <select id="classTime" required>
-                        <option value="">请选择课节</option>
-                        <option value="1-2">第一二节（8:30-10:00）</option>
-                        <option value="3-4">第三四节（10:15-11:45）</option>
-                        <option value="5-6">第五六节（14:30-16:00）</option>
-                        <option value="7-8">第七八节（16:10-17:40）</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>预约人：</label>
-                    <input type="text" id="reservationPerson" required placeholder="请输入预约人姓名">
-                </div>
-                <div class="input-group">
-                    <label>用途说明：</label>
-                    <textarea id="reservationPurpose" placeholder="请简要说明使用用途"></textarea>
-                </div>
-                <div class="button-group">
-                    <button type="submit" class="btn btn-primary">确认预约</button>
-                    <button type="button" class="btn btn-danger" id="cancelReservationBtn">取消</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 使用汇总��态框 -->
-    <div class="modal" id="summaryModal">
-        <div class="modal-content modal-large">
-            <h2>实训室使用汇总</h2>
-            <div class="summary-controls">
-                <div class="input-group">
-                    <label>开始日期：</label>
-                    <input type="date" id="summaryStartDate">
-                </div>
-                <div class="input-group">
-                    <label>结束日期：</label>
-                    <input type="date" id="summaryEndDate">
-                </div>
-                <button class="btn btn-primary" id="searchSummaryBtn">查询</button>
-            </div>
-            <div class="summary-content" id="summaryContent">
-                <!-- 汇总内容将通过JavaScript动态生成 -->
-            </div>
+            <h1>实训室管理系统 <span class="subtitle">电气实训中心 负责人 罗志涛</span></h1>
             <div class="button-group">
-                <button type="button" class="btn btn-danger" id="closeSummaryBtn">关闭</button>
+                <div class="management-buttons">
+                    <button id="addLabBtn" class="btn btn-primary">添加实训室</button>
+                </div>
+                <div class="summary-buttons">
+                    <button id="summaryReservationBtn" class="btn btn-info">预约情况</button>
+                    <button id="summaryBorrowBtn" class="btn btn-info">借出情况</button>
+                </div>
+                <div class="data-transfer-buttons">
+                    <button id="exportDataBtn" class="btn btn-success">导出数据</button>
+                    <button id="importDataBtn" class="btn btn-warning">导入数据</button>
+                    <input type="file" id="importFile" accept=".json" style="display: none;">
+                </div>
+                <div class="logout-button">
+                    <button id="logoutBtn" class="btn btn-danger">退出登录</button>
+                </div>
             </div>
+        </div>
+        <div id="labGrid" class="lab-grid">
+            <!-- 实训室卡片将通过JavaScript动态生成 -->
         </div>
     </div>
 
@@ -131,7 +50,172 @@
         </div>
     </div>
 
-    <script src="config.js"></script>
+    <!-- 实训室借出模态框 -->
+    <div class="modal" id="borrowModal">
+        <div class="modal-content">
+            <h2>实训室借出</h2>
+            <form id="borrowForm">
+                <div class="input-group">
+                    <label>借出时间：</label>
+                    <input type="datetime-local" id="borrowTime" required>
+                </div>
+                <div class="input-group">
+                    <label>借出人：</label>
+                    <input type="text" id="borrower" required>
+                </div>
+                <div class="equipment-borrow-list">
+                    <h3>借出器材</h3>
+                    <div id="borrowEquipmentList">
+                        <div class="equipment-item">
+                            <input type="text" class="form-control" placeholder="器材名称" required>
+                            <input type="text" class="form-control" placeholder="型号" required>
+                            <div class="quantity-group">
+                                <input type="number" class="form-control" placeholder="数量" min="1" required>
+                                <select class="form-control unit-select">
+                                    <option value="个">个</option>
+                                    <option value="盒">盒</option>
+                                    <option value="条">条</option>
+                                    <option value="台">台</option>
+                                    <option value="套">套</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-danger remove-equipment">删除</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-info" id="addEquipmentBtn">添加器材</button>
+                </div>
+                <div class="input-group">
+                    <label>预计归还时间：</label>
+                    <input type="datetime-local" id="expectedReturnTime" required>
+                </div>
+                <div class="input-group">
+                    <label>用途说明：</label>
+                    <textarea id="borrowPurpose"></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">确认借出</button>
+                    <button type="button" class="btn btn-danger" id="cancelBorrowBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 实训室归还模态框 -->
+    <div class="modal" id="returnModal">
+        <div class="modal-content">
+            <h2>实训室归还</h2>
+            <form id="returnForm">
+                <div class="input-group">
+                    <label>归还时间：</label>
+                    <input type="datetime-local" id="returnTime" required>
+                </div>
+                <div class="input-group">
+                    <label>归还人：</label>
+                    <input type="text" id="returner" required>
+                </div>
+                <div class="input-group">
+                    <label>备注：</label>
+                    <textarea id="returnNote"></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">确认归还</button>
+                    <button type="button" class="btn btn-danger" id="cancelReturnBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加/编辑实训室的模态框 -->
+    <div class="modal" id="labModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">添加实训室</h2>
+            <form id="labForm">
+                <div class="input-group">
+                    <label>实训室名称：</label>
+                    <input type="text" id="labName" required>
+                </div>
+                <div class="input-group">
+                    <label>状态：</label>
+                    <select id="labStatus" required>
+                        <option value="free">空闲</option>
+                        <option value="reserved">已预约</option>
+                        <option value="occupied">使用中</option>
+                        <option value="borrowed">已借出</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>设备列表（每行一个）：</label>
+                    <textarea id="labEquipment" required></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">确认</button>
+                    <button type="button" class="btn btn-danger" id="cancelBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 预约模态框 -->
+    <div class="modal" id="reservationModal">
+        <div class="modal-content">
+            <h2>预约实训室</h2>
+            <form id="reservationForm">
+                <div class="input-group">
+                    <label>预约日期：</label>
+                    <input type="date" id="reservationDate" required>
+                </div>
+                <div class="input-group">
+                    <label>课节：</label>
+                    <select id="classTime" required>
+                        <option value="">请选择课节</option>
+                        <option value="1-2节">第一二节（8:30-10:00）</option>
+                        <option value="3-4节">第三四节（10:15-11:45）</option>
+                        <option value="5-6节">第五六节（14:30-16:00）</option>
+                        <option value="7-8节">第七八节（16:10-17:40）</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>预约人：</label>
+                    <input type="text" id="reservationPerson" required>
+                </div>
+                <div class="input-group">
+                    <label>用途说明：</label>
+                    <textarea id="reservationPurpose"></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">确认预约</button>
+                    <button type="button" class="btn btn-danger" id="cancelReservationBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 预约汇总模态框 -->
+    <div class="modal" id="summaryReservationModal">
+        <div class="modal-content modal-large">
+            <h2>预约情况</h2>
+            <div class="summary-content" id="reservationSummaryContent">
+                <!-- 预约汇总内容将通过JavaScript动态生成 -->
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-danger" id="closeSummaryReservationBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 借出汇总模态框 -->
+    <div class="modal" id="summaryBorrowModal">
+        <div class="modal-content modal-large">
+            <h2>借出情况</h2>
+            <div class="summary-content" id="borrowSummaryContent">
+                <!-- 借出汇总内容将通过JavaScript动态生成 -->
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-danger" id="closeSummaryBorrowBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html> 

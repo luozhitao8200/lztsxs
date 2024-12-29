@@ -1,28 +1,29 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实训室管理系统</title>
+    <title>实训室管理系统 - 登录</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
 </head>
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h2>实训室管理系统</h2>
+            <h1>实训室管理系统</h1>
             <form id="loginForm">
                 <div class="input-group">
-                    <input type="text" id="username" required placeholder="请输入账号">
+                    <label>用户名：</label>
+                    <input type="text" id="username" required>
                 </div>
                 <div class="input-group">
-                    <input type="password" id="password" required placeholder="请输入密码">
+                    <label>密码：</label>
+                    <input type="password" id="password" required>
                 </div>
-                <button type="submit" class="login-btn">登录</button>
+                <button type="submit" class="btn btn-primary">登录</button>
             </form>
         </div>
     </div>
-    <script src="config.js"></script>
+
     <script src="script.js"></script>
 </body>
 </html> 
