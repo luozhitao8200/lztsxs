@@ -95,6 +95,7 @@ function showAdminAuth(action) {
 
 // 更新实训室状态
 function updateLabStatus(lab) {
+    // 如果没有预约记录，直接返回空闲状态
     if (!lab.reservations || lab.reservations.length === 0) {
         return 'free';
     }
@@ -118,14 +119,14 @@ function updateLabStatus(lab) {
         return 'occupied';
     }
 
-    // 检查是否有当天未结束的预约
+    // 检查当天是否还有未开始的预约
     const hasTodayReservation = lab.reservations.some(reservation => {
         if (reservation.date === today) {
             const timeRange = getTimeRange(reservation.time);
             if (!timeRange) return false;
             
-            // 只有当预约时间还未结束时才算作今天的预约
-            return currentTime < timeRange.end;
+            // 只检查未开始的预约
+            return currentTime < timeRange.start;
         }
         return false;
     });
@@ -143,6 +144,7 @@ function updateLabStatus(lab) {
         return 'reserved';  // 未来有预约，显示黄色
     }
 
+    // 当天没有预约且没有使用，显示为空闲状态
     return 'free';
 }
 
