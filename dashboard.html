@@ -5,54 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>实训室管理系统 - 管理界面</title>
     <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <script src="script.js"></script>
 </head>
 <body>
     <div class="dashboard">
         <div class="header">
             <h1>实训室管理系统 <span class="subtitle">电气实训中心 负责人 罗志涛</span></h1>
             <div class="button-group">
-                <div class="management-buttons">
-                    <button id="addLabBtn" class="btn btn-primary">添加实训室</button>
-                </div>
-                <div class="summary-buttons">
-                    <button id="summaryReservationBtn" class="btn btn-info">预约情况</button>
-                    <button id="summaryBorrowBtn" class="btn btn-info">借出情况</button>
-                </div>
-                <div class="data-transfer-buttons">
-                    <button id="exportDataBtn" class="btn btn-success">导出数据</button>
-                    <button id="importDataBtn" class="btn btn-warning">导入数据</button>
-                    <input type="file" id="importFile" accept=".json" style="display: none;">
-                </div>
-                <div class="logout-button">
-                    <button id="logoutBtn" class="btn btn-danger">退出登录</button>
-                </div>
+                <button id="addLabBtn" class="btn btn-primary" onclick="openAddLab()">添加实训室</button>
+                <button id="summaryReservationBtn" class="btn btn-info">预约情况</button>
+                <button id="summaryBorrowBtn" class="btn btn-info">借出情况</button>
+                <button id="exportDataBtn" class="btn btn-success">导出数据</button>
+                <button id="importDataBtn" class="btn btn-warning">导入数据</button>
+                <button id="logoutBtn" class="btn btn-danger">退出登录</button>
             </div>
+            <input type="file" id="importFile" accept=".json" style="display: none;">
         </div>
-        <div id="labGrid" class="lab-grid">
-            <!-- 实训室卡片将通过JavaScript动态生成 -->
-        </div>
-    </div>
-
-    <!-- 管理员密码验证模态框 -->
-    <div class="modal" id="adminAuthModal">
-        <div class="modal-content">
-            <h2>管理员验证</h2>
-            <form id="adminAuthForm">
-                <div class="input-group">
-                    <label>请输入管理员密码：</label>
-                    <input type="password" id="adminPassword" required>
-                </div>
-                <div class="button-group">
-                    <button type="submit" class="btn btn-primary">确认</button>
-                    <button type="button" class="btn btn-danger" id="cancelAuthBtn">取消</button>
-                </div>
-            </form>
-        </div>
+        <div id="labGrid" class="lab-grid"></div>
     </div>
 
     <!-- 实训室借出模态框 -->
     <div class="modal" id="borrowModal">
-        <div class="modal-content">
+        <div class="modal-content borrow-modal">
             <h2>实训室借出</h2>
             <form id="borrowForm">
                 <div class="input-group">
@@ -74,9 +49,14 @@
                                 <select class="form-control unit-select">
                                     <option value="个">个</option>
                                     <option value="盒">盒</option>
-                                    <option value="条">条</option>
+                                    <option value="卷">卷</option>
                                     <option value="台">台</option>
                                     <option value="套">套</option>
+                                    <option value="条">条</option>
+                                    <option value="把">把</option>
+                                    <option value="片">片</option>
+                                    <option value="箱">箱</option>
+                                    <option value="包">包</option>
                                 </select>
                             </div>
                             <button type="button" class="btn btn-danger remove-equipment">删除</button>
@@ -94,7 +74,7 @@
                 </div>
                 <div class="button-group">
                     <button type="submit" class="btn btn-primary">确认借出</button>
-                    <button type="button" class="btn btn-danger" id="cancelBorrowBtn">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="closeModal('borrowModal')">取消</button>
                 </div>
             </form>
         </div>
@@ -103,7 +83,7 @@
     <!-- 实训室归还模态框 -->
     <div class="modal" id="returnModal">
         <div class="modal-content">
-            <h2>实训室归还</h2>
+            <h2>归还器材</h2>
             <form id="returnForm">
                 <div class="input-group">
                     <label>归还时间：</label>
@@ -119,7 +99,7 @@
                 </div>
                 <div class="button-group">
                     <button type="submit" class="btn btn-primary">确认归还</button>
-                    <button type="button" class="btn btn-danger" id="cancelReturnBtn">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="closeModal('returnModal')">取消</button>
                 </div>
             </form>
         </div>
@@ -129,27 +109,26 @@
     <div class="modal" id="labModal">
         <div class="modal-content">
             <h2 id="modalTitle">添加实训室</h2>
-            <form id="labForm">
+            <form id="labForm" onsubmit="handleLabSubmit(event)">
                 <div class="input-group">
                     <label>实训室名称：</label>
                     <input type="text" id="labName" required>
                 </div>
                 <div class="input-group">
                     <label>状态：</label>
-                    <select id="labStatus" required>
+                    <select id="labStatus">
                         <option value="free">空闲</option>
-                        <option value="reserved">已预约</option>
                         <option value="occupied">使用中</option>
-                        <option value="borrowed">已借出</option>
+                        <option value="reserved">已预约</option>
                     </select>
                 </div>
                 <div class="input-group">
                     <label>设备列表（每行一个）：</label>
-                    <textarea id="labEquipment" required></textarea>
+                    <textarea id="labEquipment" rows="5"></textarea>
                 </div>
                 <div class="button-group">
                     <button type="submit" class="btn btn-primary">确认</button>
-                    <button type="button" class="btn btn-danger" id="cancelBtn">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="closeModal('labModal')">取消</button>
                 </div>
             </form>
         </div>
@@ -184,7 +163,7 @@
                 </div>
                 <div class="button-group">
                     <button type="submit" class="btn btn-primary">确认预约</button>
-                    <button type="button" class="btn btn-danger" id="cancelReservationBtn">取消</button>
+                    <button type="button" class="btn btn-danger" id="cancelReservationBtn" onclick="closeModal('reservationModal')">取消</button>
                 </div>
             </form>
         </div>
