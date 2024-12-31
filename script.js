@@ -821,19 +821,22 @@ window.logout = function() {
     window.location.href = 'index.html';
 };
 
-// 登录处理
-window.handleLogin = function(e) {
-    e.preventDefault();
+// 处理登录
+function handleLogin(event) {
+    event.preventDefault();
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
-    if (username === 'admin' && password === 'admin') {
+    // 验证用户名和密码
+    if (username === '罗志涛' && password === '123456') {
+        // 设置登录状态
         localStorage.setItem('isLoggedIn', 'true');
+        // 跳转到管理界面
         window.location.href = 'dashboard.html';
     } else {
         alert('用户名或密码错误！');
     }
-};
+}
 
 // 预约情况汇总
 window.showReservationSummary = function() {
